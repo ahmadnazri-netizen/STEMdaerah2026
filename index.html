@@ -114,27 +114,41 @@
     <div class="max-w-7xl mx-auto space-y-6">
         
         <!-- Header Section -->
-        <header class="glass-panel rounded-2xl p-6 relative overflow-hidden">
+        <header class="glass-panel rounded-2xl p-8 md:p-10 relative overflow-hidden flex flex-col items-center text-center">
+            <!-- Background Watermark Icons -->
             <div class="absolute -right-4 -top-8 text-primary opacity-5 text-[10rem]">
                 <i class="fa-solid fa-microchip"></i>
             </div>
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-                <div>
-                    <div class="flex items-center gap-3 mb-2">
-                        <div class="bg-primary/10 p-2 rounded-lg text-primary shadow-sm border border-primary/20">
-                            <i class="fa-solid fa-rocket text-xl"></i>
-                        </div>
-                        <h3 class="text-primary font-rajdhani font-bold tracking-widest uppercase text-sm">Sistem Pemantauan Bersepadu</h3>
-                    </div>
-                    <h1 class="text-3xl md:text-4xl font-rajdhani font-extrabold text-slate-800 tracking-tight">SENARAI PESERTA STEM</h1>
-                    <h2 class="text-xl md:text-2xl font-rajdhani font-bold text-slate-500">PERINGKAT DAERAH SELURUH TERENGGANU 2026</h2>
-                </div>
-                <div class="text-right">
-                    <div class="text-sm text-slate-500 font-medium">Status Data</div>
-                    <div class="flex items-center gap-2 justify-end text-emerald-500 font-bold bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 mt-1 shadow-sm">
-                        <i class="fa-solid fa-satellite-dish animate-pulse"></i> Live Terhubung
+            <div class="absolute -left-10 -bottom-10 text-secondary opacity-5 text-[12rem]">
+                <i class="fa-solid fa-atom"></i>
+            </div>
+            
+            <div class="relative z-10 w-full flex flex-col items-center">
+                <!-- Status Badge -->
+                <div class="flex items-center justify-center mb-6">
+                    <div class="flex items-center gap-2 text-emerald-600 font-bold bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-200 shadow-sm text-sm">
+                        <i class="fa-solid fa-satellite-dish animate-pulse"></i> Data Live Terhubung
                     </div>
                 </div>
+
+                <!-- Subtitle Mini -->
+                <div class="flex items-center justify-center gap-3 mb-3">
+                    <div class="bg-primary/10 p-2 rounded-lg text-primary shadow-sm border border-primary/20 flex items-center justify-center">
+                        <i class="fa-solid fa-rocket text-xl"></i>
+                    </div>
+                    <h3 class="text-primary font-rajdhani font-bold tracking-widest uppercase text-sm md:text-base">Sistem Pemantauan Bersepadu</h3>
+                </div>
+                
+                <!-- Main Title (Dipesarkan & Ditengah) -->
+                <h1 class="text-4xl md:text-5xl lg:text-6xl font-rajdhani font-extrabold text-slate-800 tracking-tight mb-4 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-5 leading-tight">
+                    <i class="fa-solid fa-atom text-secondary animate-[spin_10s_linear_infinite] text-4xl lg:text-5xl"></i> 
+                    <span>SENARAI PESERTA STEM DAERAH</span>
+                    <i class="fa-solid fa-robot text-primary text-4xl lg:text-5xl hover:-translate-y-2 transition duration-300"></i>
+                </h1>
+                
+                <h2 class="text-lg md:text-2xl font-rajdhani font-bold text-slate-500 tracking-wide">
+                    PERINGKAT SELURUH TERENGGANU 2026
+                </h2>
             </div>
         </header>
 
@@ -319,17 +333,45 @@
                     if(results.data && results.data.length > 0) {
                         identifyColumns(results.meta.fields);
                         
-                        // Clean and normalize data
-                        let tempRawData = results.data.filter(row => {
-                            // Only keep rows that have at least a school or student name to avoid completely empty ghost rows
-                            return row[colMap.sekolah] || row[colMap.murid];
-                        }).map(row => ({
-                            daerah: row[colMap.daerah] ? row[colMap.daerah].trim() : 'TIADA MAKLUMAT',
-                            sekolah: row[colMap.sekolah] ? row[colMap.sekolah].trim() : 'TIADA MAKLUMAT',
-                            pertandingan: row[colMap.pertandingan] ? row[colMap.pertandingan].trim() : 'TIADA MAKLUMAT',
-                            murid: row[colMap.murid] ? row[colMap.murid].trim() : 'TIADA MAKLUMAT',
-                            guru: row[colMap.guru] ? row[colMap.guru].trim() : 'TIADA MAKLUMAT'
-                        }));
+                        // Logik "Fill-Down" untuk menyokong sel yang digabungkan (merged cells) atau kosong dalam Google Sheets
+                        let lastDaerah = 'TIADA MAKLUMAT';
+                        let lastSekolah = 'TIADA MAKLUMAT';
+                        let lastPertandingan = 'TIADA MAKLUMAT';
+                        let lastGuru = 'TIADA MAKLUMAT';
+
+                        let tempRawData = [];
+                        
+                        results.data.forEach(row => {
+                            let rawDaerah = row[colMap.daerah] ? row[colMap.daerah].trim() : '';
+                            let rawSekolah = row[colMap.sekolah] ? row[colMap.sekolah].trim() : '';
+                            let rawPertandingan = row[colMap.pertandingan] ? row[colMap.pertandingan].trim() : '';
+                            let rawMurid = row[colMap.murid] ? row[colMap.murid].trim() : '';
+                            let rawGuru = row[colMap.guru] ? row[colMap.guru].trim() : '';
+
+                            // Abaikan baris yang kosong sepenuhnya (ghost rows)
+                            if (!rawSekolah && !rawMurid && !rawPertandingan) return; 
+
+                            // Update nilai 'fill-down' jika ada data, jika kosong, ambil data dari baris yang di atasnya
+                            if (rawDaerah !== '') lastDaerah = rawDaerah;
+                            else rawDaerah = lastDaerah;
+
+                            if (rawSekolah !== '') lastSekolah = rawSekolah;
+                            else rawSekolah = lastSekolah;
+
+                            if (rawPertandingan !== '') lastPertandingan = rawPertandingan;
+                            else rawPertandingan = lastPertandingan;
+
+                            if (rawGuru !== '') lastGuru = rawGuru;
+                            else rawGuru = lastGuru;
+
+                            tempRawData.push({
+                                daerah: rawDaerah || 'TIADA MAKLUMAT',
+                                sekolah: rawSekolah || 'TIADA MAKLUMAT',
+                                pertandingan: rawPertandingan || 'TIADA MAKLUMAT',
+                                murid: rawMurid !== '' ? rawMurid : 'TIADA MAKLUMAT',
+                                guru: rawGuru || 'TIADA MAKLUMAT'
+                            });
+                        });
 
                         // Proses Gabungan (Grouping) berdasarkan Sekolah dan Pertandingan
                         let groupedMap = {};
