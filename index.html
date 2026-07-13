@@ -38,6 +38,7 @@
     
     <!-- Chart.js for Analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 
     <style>
         body {
@@ -138,7 +139,7 @@
         </header>
 
         <!-- Statistics Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <!-- Total Peserta -->
             <div class="glass-panel rounded-xl p-5 border-l-4 border-l-primary flex items-center justify-between group hover:bg-white/80 hover:shadow-md transition duration-300">
                 <div>
@@ -162,26 +163,15 @@
                 </div>
             </div>
 
-            <!-- Daerah Tertinggi -->
+            <!-- Pertandingan Popular -->
             <div class="glass-panel rounded-xl p-5 border-l-4 border-l-accent flex items-center justify-between group hover:bg-white/80 hover:shadow-md transition duration-300">
                 <div class="w-2/3">
-                    <p class="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Daerah Juara</p>
-                    <h3 class="text-lg font-rajdhani font-bold text-slate-800 truncate" id="stat-daerah">-</h3>
-                    <p class="text-xs text-accent font-medium mt-1" id="stat-daerah-count">0 penyertaan</p>
+                    <p class="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Kategori Popular</p>
+                    <h3 class="text-lg font-rajdhani font-bold text-slate-800 truncate" id="stat-popular">-</h3>
+                    <p class="text-xs text-accent font-medium mt-1" id="stat-popular-count">0 penyertaan</p>
                 </div>
                 <div class="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition shrink-0 shadow-inner">
-                    <i class="fa-solid fa-map-location-dot text-xl"></i>
-                </div>
-            </div>
-
-            <!-- Jumlah Kategori Pertandingan -->
-            <div class="glass-panel rounded-xl p-5 border-l-4 border-l-emerald-500 flex items-center justify-between group hover:bg-white/80 hover:shadow-md transition duration-300">
-                <div>
-                    <p class="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Kategori Dipertandingkan</p>
-                    <h3 class="text-3xl font-rajdhani font-bold text-slate-800" id="stat-kategori">0</h3>
-                </div>
-                <div class="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:scale-110 transition shadow-inner">
-                    <i class="fa-solid fa-gamepad text-xl"></i>
+                    <i class="fa-solid fa-fire text-xl"></i>
                 </div>
             </div>
         </div>
@@ -245,6 +235,16 @@
             </div>
         </div>
 
+        <!-- NEW: Chart Bilangan Sekolah Berdaftar Mengikut Daerah -->
+        <div class="glass-panel rounded-2xl p-6">
+            <h3 class="font-rajdhani font-bold text-xl mb-4 flex items-center gap-2 text-slate-800">
+                <i class="fa-solid fa-school-flag text-secondary"></i> Analisis Bilangan Sekolah Berdaftar Mengikut Daerah
+            </h3>
+            <div class="relative h-64 md:h-80 w-full">
+                <canvas id="daerahChart"></canvas>
+            </div>
+        </div>
+
         <!-- Data Table Section -->
         <div class="glass-panel rounded-2xl p-6">
             <div class="flex justify-between items-center mb-4">
@@ -293,6 +293,7 @@
         let rawData = [];
         let filteredData = [];
         let chartInstance = null;
+        let daerahChartInstance = null;
 
         // Keys we are mapping to. (Handles slight variations in header names from the Google Sheet)
         let colMap = {
@@ -457,6 +458,7 @@
             updateStats();
             updateTable();
             renderChart();
+            renderDaerahChart();
         }
 
         function updateStats() {
@@ -467,23 +469,18 @@
             if (filteredData.length === 0) {
                 document.getElementById('stat-sekolah').textContent = '-';
                 document.getElementById('stat-sekolah-count').textContent = '0 penyertaan';
-                document.getElementById('stat-daerah').textContent = '-';
-                document.getElementById('stat-daerah-count').textContent = '0 penyertaan';
-                document.getElementById('stat-kategori').textContent = '0';
+                document.getElementById('stat-popular').textContent = '-';
+                document.getElementById('stat-popular-count').textContent = '0 penyertaan';
                 return;
             }
 
-            // Kategori Dipertandingkan
-            const katSet = new Set(filteredData.map(d => d.pertandingan));
-            document.getElementById('stat-kategori').textContent = katSet.size;
-
-            // Analytics: Sekolah paling banyak & Daerah paling tinggi
+            // Analytics: Sekolah paling banyak & Pertandingan paling popular
             const sekCount = {};
-            const daeCount = {};
+            const pertCount = {};
 
             filteredData.forEach(d => {
                 if(d.sekolah && d.sekolah !== 'TIADA MAKLUMAT') sekCount[d.sekolah] = (sekCount[d.sekolah] || 0) + 1;
-                if(d.daerah && d.daerah !== 'TIADA MAKLUMAT') daeCount[d.daerah] = (daeCount[d.daerah] || 0) + 1;
+                if(d.pertandingan && d.pertandingan !== 'TIADA MAKLUMAT') pertCount[d.pertandingan] = (pertCount[d.pertandingan] || 0) + 1;
             });
 
             let topSekolah = { nama: '-', count: 0 };
@@ -491,15 +488,15 @@
                 if(count > topSekolah.count) { topSekolah = { nama, count }; }
             }
 
-            let topDaerah = { nama: '-', count: 0 };
-            for(const [nama, count] of Object.entries(daeCount)) {
-                if(count > topDaerah.count) { topDaerah = { nama, count }; }
+            let topPertandingan = { nama: '-', count: 0 };
+            for(const [nama, count] of Object.entries(pertCount)) {
+                if(count > topPertandingan.count) { topPertandingan = { nama, count }; }
             }
 
             document.getElementById('stat-sekolah').textContent = topSekolah.nama;
-            document.getElementById('stat-sekolah-count').textContent = `${topSekolah.count} penyertaan peserta`;
-            document.getElementById('stat-daerah').textContent = topDaerah.nama;
-            document.getElementById('stat-daerah-count').textContent = `${topDaerah.count} penyertaan peserta`;
+            document.getElementById('stat-sekolah-count').textContent = `${topSekolah.count} penyertaan pasukan`;
+            document.getElementById('stat-popular').textContent = topPertandingan.nama;
+            document.getElementById('stat-popular-count').textContent = `${topPertandingan.count} penyertaan sekolah`;
         }
 
         function updateTable() {
@@ -604,6 +601,7 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: { display: false },
+                        datalabels: { display: false }, // Tutup plugin label untuk chart pertama agar tidak serabut
                         tooltip: {
                             backgroundColor: 'rgba(255, 255, 255, 0.95)',
                             titleColor: '#0f172a', // slate-900
@@ -633,6 +631,98 @@
                                     let label = this.getLabelForValue(val);
                                     return label.length > 20 ? label.substr(0, 20) + '...' : label;
                                 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderDaerahChart() {
+            const ctx = document.getElementById('daerahChart').getContext('2d');
+            
+            // Kira bilangan sekolah yang unik berdasarkan daerah
+            const sekolahIkutDaerah = {};
+            filteredData.forEach(d => {
+                if(d.daerah && d.daerah !== 'TIADA MAKLUMAT' && d.sekolah && d.sekolah !== 'TIADA MAKLUMAT') {
+                    if(!sekolahIkutDaerah[d.daerah]) {
+                        sekolahIkutDaerah[d.daerah] = new Set();
+                    }
+                    sekolahIkutDaerah[d.daerah].add(d.sekolah);
+                }
+            });
+
+            // Sediakan Data mengikut Abjad Daerah
+            const labels = Object.keys(sekolahIkutDaerah).sort();
+            const data = labels.map(daerah => sekolahIkutDaerah[daerah].size);
+
+            if (daerahChartInstance) {
+                daerahChartInstance.destroy();
+            }
+
+            // Daftar Plugin DataLabels HANYA untuk graf ini (Local Registration)
+            const localPlugins = [];
+            if (typeof ChartDataLabels !== 'undefined') {
+                localPlugins.push(ChartDataLabels);
+            }
+
+            daerahChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Bilangan Sekolah',
+                        data: data,
+                        backgroundColor: 'rgba(139, 92, 246, 0.8)', // Violet pastel
+                        borderColor: 'rgba(139, 92, 246, 1)',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        hoverBackgroundColor: 'rgba(244, 63, 94, 0.9)', // Rose hover
+                        hoverBorderColor: 'rgba(244, 63, 94, 1)',
+                    }]
+                },
+                plugins: localPlugins,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        datalabels: {
+                            color: '#475569', // slate-600
+                            anchor: 'end',
+                            align: 'top',
+                            offset: 4,
+                            font: {
+                                family: 'Rajdhani',
+                                weight: 'bold',
+                                size: 14
+                            },
+                            formatter: Math.round // Memastikan output pada graf tidak mempunyai perpuluhan
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#0f172a',
+                            bodyColor: '#334155',
+                            titleFont: { family: 'Rajdhani', size: 16, weight: 'bold' },
+                            bodyFont: { family: 'Inter', size: 14, weight: '500' },
+                            padding: 12,
+                            borderColor: 'rgba(226, 232, 240, 1)',
+                            borderWidth: 1,
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                            ticks: { precision: 0 },
+                            grace: '15%' // Ruang tambahan di bahagian atas carta bagi menampung teks data labels
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                autoSkip: false,
+                                font: { weight: '600' }
                             }
                         }
                     }
