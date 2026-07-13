@@ -124,11 +124,14 @@
             </div>
             
             <div class="relative z-10 w-full flex flex-col items-center">
-                <!-- Status Badge -->
-                <div class="flex items-center justify-center mb-6">
-                    <div class="flex items-center gap-2 text-emerald-600 font-bold bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-200 shadow-sm text-sm">
+                <!-- Status Badge & Refresh -->
+                <div class="flex flex-wrap items-center justify-center gap-3 mb-6">
+                    <div class="flex items-center gap-2 text-emerald-600 font-bold bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-200 shadow-sm text-sm cursor-default">
                         <i class="fa-solid fa-satellite-dish animate-pulse"></i> Data Live Terhubung
                     </div>
+                    <button onclick="refreshData()" class="flex items-center gap-2 text-primary font-bold bg-primary/10 hover:bg-primary/20 px-4 py-1.5 rounded-full border border-primary/20 shadow-sm text-sm transition-all duration-300 group">
+                        <i class="fa-solid fa-arrows-rotate group-hover:rotate-180 transition-transform duration-500"></i> Segar Semula
+                    </button>
                 </div>
 
                 <!-- Subtitle Mini -->
@@ -170,7 +173,7 @@
                 <div class="w-2/3">
                     <p class="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Sekolah Teraktif</p>
                     <h3 class="text-lg font-rajdhani font-bold text-slate-800 truncate" id="stat-sekolah">-</h3>
-                    <p class="text-xs text-secondary font-medium mt-1" id="stat-sekolah-count">0 penyertaan</p>
+                    <p class="text-xs text-secondary font-medium mt-1" id="stat-sekolah-count">0 jenis pertandingan</p>
                 </div>
                 <div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center text-secondary group-hover:scale-110 transition shrink-0 shadow-inner">
                     <i class="fa-solid fa-school-flag text-xl"></i>
@@ -182,7 +185,7 @@
                 <div class="w-2/3">
                     <p class="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Kategori Popular</p>
                     <h3 class="text-lg font-rajdhani font-bold text-slate-800 truncate" id="stat-popular">-</h3>
-                    <p class="text-xs text-accent font-medium mt-1" id="stat-popular-count">0 penyertaan</p>
+                    <p class="text-xs text-accent font-medium mt-1" id="stat-popular-count">0 buah sekolah</p>
                 </div>
                 <div class="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition shrink-0 shadow-inner">
                     <i class="fa-solid fa-fire text-xl"></i>
@@ -301,7 +304,6 @@
     <script>
         // Google Sheet CSV Export Link based on provided URL
         const SHEET_ID = '1nXy04NFUJXhpjm5wJZ3P06Kp008FyYtTg2EzjuCTgqU';
-        const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
 
         // Global state for raw and filtered data
         let rawData = [];
@@ -325,7 +327,11 @@
         });
 
         function fetchData() {
-            Papa.parse(CSV_URL, {
+            // Generate URL dengan timestamp masa nyata untuk 'Bypass Cache' Google Sheets
+            const timestamp = new Date().getTime();
+            const nocacheUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&_t=${timestamp}`;
+
+            Papa.parse(nocacheUrl, {
                 download: true,
                 header: true,
                 skipEmptyLines: true,
@@ -444,8 +450,14 @@
                 <div class="text-accent text-5xl mb-4"><i class="fa-solid fa-triangle-exclamation"></i></div>
                 <h2 class="font-rajdhani text-2xl text-accent font-bold tracking-wider">RALAT DATA</h2>
                 <p class="text-slate-300 mt-2 text-center max-w-md">${msg}</p>
-                <button onclick="location.reload()" class="mt-6 bg-accent hover:bg-rose-600 px-6 py-2 rounded-lg font-semibold transition">Cuba Semula</button>
+                <button onclick="location.reload()" class="mt-6 bg-accent hover:bg-rose-600 px-6 py-2 rounded-lg font-semibold transition text-white">Cuba Semula</button>
             `;
+        }
+
+        // Fungsi manual untuk refresh data tanpa reload browser
+        function refreshData() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            fetchData();
         }
 
         function populateFilters() {
@@ -459,6 +471,10 @@
 
             const selDaerah = document.getElementById('filter-daerah');
             const selPertandingan = document.getElementById('filter-pertandingan');
+
+            // Kosongkan senarai dropdown dahulu untuk elak data pendua bila di-refresh
+            selDaerah.innerHTML = '<option value="ALL">Semua Daerah</option>';
+            selPertandingan.innerHTML = '<option value="ALL">Semua Pertandingan</option>';
 
             Array.from(daerahSet).sort().forEach(d => {
                 const opt = document.createElement('option');
@@ -510,35 +526,44 @@
 
             if (filteredData.length === 0) {
                 document.getElementById('stat-sekolah').textContent = '-';
-                document.getElementById('stat-sekolah-count').textContent = '0 penyertaan';
+                document.getElementById('stat-sekolah-count').textContent = '0 jenis pertandingan';
                 document.getElementById('stat-popular').textContent = '-';
-                document.getElementById('stat-popular-count').textContent = '0 penyertaan';
+                document.getElementById('stat-popular-count').textContent = '0 buah sekolah';
                 return;
             }
 
-            // Analytics: Sekolah paling banyak & Pertandingan paling popular
+            // Analytics menggunakan SET untuk memastikan data UNIK (tiada duplikasi kiraan)
             const sekCount = {};
             const pertCount = {};
 
             filteredData.forEach(d => {
-                if(d.sekolah && d.sekolah !== 'TIADA MAKLUMAT') sekCount[d.sekolah] = (sekCount[d.sekolah] || 0) + 1;
-                if(d.pertandingan && d.pertandingan !== 'TIADA MAKLUMAT') pertCount[d.pertandingan] = (pertCount[d.pertandingan] || 0) + 1;
+                // Untuk Sekolah Teraktif: Kira berapa banyak JENIS PERTANDINGAN yang disertai
+                if(d.sekolah && d.sekolah !== 'TIADA MAKLUMAT' && d.pertandingan && d.pertandingan !== 'TIADA MAKLUMAT') {
+                    if(!sekCount[d.sekolah]) sekCount[d.sekolah] = new Set();
+                    sekCount[d.sekolah].add(d.pertandingan);
+                }
+                
+                // Untuk Kategori Popular: Kira berapa banyak NAMA SEKOLAH yang sertai
+                if(d.pertandingan && d.pertandingan !== 'TIADA MAKLUMAT' && d.sekolah && d.sekolah !== 'TIADA MAKLUMAT') {
+                    if(!pertCount[d.pertandingan]) pertCount[d.pertandingan] = new Set();
+                    pertCount[d.pertandingan].add(d.sekolah);
+                }
             });
 
             let topSekolah = { nama: '-', count: 0 };
-            for(const [nama, count] of Object.entries(sekCount)) {
-                if(count > topSekolah.count) { topSekolah = { nama, count }; }
+            for(const [nama, setPert] of Object.entries(sekCount)) {
+                if(setPert.size > topSekolah.count) { topSekolah = { nama, count: setPert.size }; }
             }
 
             let topPertandingan = { nama: '-', count: 0 };
-            for(const [nama, count] of Object.entries(pertCount)) {
-                if(count > topPertandingan.count) { topPertandingan = { nama, count }; }
+            for(const [nama, setSekolah] of Object.entries(pertCount)) {
+                if(setSekolah.size > topPertandingan.count) { topPertandingan = { nama, count: setSekolah.size }; }
             }
 
             document.getElementById('stat-sekolah').textContent = topSekolah.nama;
-            document.getElementById('stat-sekolah-count').textContent = `${topSekolah.count} penyertaan pasukan`;
+            document.getElementById('stat-sekolah-count').textContent = `${topSekolah.count} jenis pertandingan`;
             document.getElementById('stat-popular').textContent = topPertandingan.nama;
-            document.getElementById('stat-popular-count').textContent = `${topPertandingan.count} penyertaan sekolah`;
+            document.getElementById('stat-popular-count').textContent = `${topPertandingan.count} buah sekolah`;
         }
 
         function updateTable() {
