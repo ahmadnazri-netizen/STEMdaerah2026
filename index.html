@@ -171,9 +171,9 @@
             <!-- Sekolah Paling Aktif -->
             <div class="glass-panel rounded-xl p-5 border-l-4 border-l-secondary flex items-center justify-between group hover:bg-white/80 hover:shadow-md transition duration-300">
                 <div class="w-2/3">
-                    <p class="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Sekolah Teraktif</p>
+                    <p class="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Sekolah Aktif</p>
                     <h3 class="text-lg font-rajdhani font-bold text-slate-800 truncate" id="stat-sekolah">-</h3>
-                    <p class="text-xs text-secondary font-medium mt-1" id="stat-sekolah-count">0 jenis pertandingan</p>
+                    <p class="text-xs text-secondary font-medium mt-1" id="stat-sekolah-count">0 penyertaan</p>
                 </div>
                 <div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center text-secondary group-hover:scale-110 transition shrink-0 shadow-inner">
                     <i class="fa-solid fa-school-flag text-xl"></i>
@@ -329,7 +329,8 @@
         function fetchData() {
             // Generate URL dengan timestamp masa nyata untuk 'Bypass Cache' Google Sheets
             const timestamp = new Date().getTime();
-            const nocacheUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&_t=${timestamp}`;
+            // Tukar dari /gviz/tq kepada laluan eksport terus (lebih pantas & kurang cache)
+            const nocacheUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0&_cb=${timestamp}`;
 
             Papa.parse(nocacheUrl, {
                 download: true,
@@ -526,7 +527,7 @@
 
             if (filteredData.length === 0) {
                 document.getElementById('stat-sekolah').textContent = '-';
-                document.getElementById('stat-sekolah-count').textContent = '0 jenis pertandingan';
+                document.getElementById('stat-sekolah-count').textContent = '0 penyertaan';
                 document.getElementById('stat-popular').textContent = '-';
                 document.getElementById('stat-popular-count').textContent = '0 buah sekolah';
                 return;
@@ -537,10 +538,11 @@
             const pertCount = {};
 
             filteredData.forEach(d => {
-                // Untuk Sekolah Teraktif: Kira berapa banyak JENIS PERTANDINGAN yang disertai
-                if(d.sekolah && d.sekolah !== 'TIADA MAKLUMAT' && d.pertandingan && d.pertandingan !== 'TIADA MAKLUMAT') {
-                    if(!sekCount[d.sekolah]) sekCount[d.sekolah] = new Set();
-                    sekCount[d.sekolah].add(d.pertandingan);
+                // Untuk Sekolah Aktif: Kira berapa banyak PENYERTAAN (jumlah baris/kumpulan yang dihantar)
+                if(d.sekolah && d.sekolah !== 'TIADA MAKLUMAT') {
+                    if(!sekCount[d.sekolah]) sekCount[d.sekolah] = 0;
+                    // Gunakan panjang array murid untuk mendapatkan jumlah asal penyertaan sebelum digabungkan
+                    sekCount[d.sekolah] += d.murid.length > 0 ? d.murid.length : 1;
                 }
                 
                 // Untuk Kategori Popular: Kira berapa banyak NAMA SEKOLAH yang sertai
@@ -551,8 +553,8 @@
             });
 
             let topSekolah = { nama: '-', count: 0 };
-            for(const [nama, setPert] of Object.entries(sekCount)) {
-                if(setPert.size > topSekolah.count) { topSekolah = { nama, count: setPert.size }; }
+            for(const [nama, count] of Object.entries(sekCount)) {
+                if(count > topSekolah.count) { topSekolah = { nama, count: count }; }
             }
 
             let topPertandingan = { nama: '-', count: 0 };
@@ -561,7 +563,7 @@
             }
 
             document.getElementById('stat-sekolah').textContent = topSekolah.nama;
-            document.getElementById('stat-sekolah-count').textContent = `${topSekolah.count} jenis pertandingan`;
+            document.getElementById('stat-sekolah-count').textContent = `${topSekolah.count} penyertaan`;
             document.getElementById('stat-popular').textContent = topPertandingan.nama;
             document.getElementById('stat-popular-count').textContent = `${topPertandingan.count} buah sekolah`;
         }
