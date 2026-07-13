@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Peserta STEM Terengganu 2026</title>
+    
+    <!-- Fonts: Rajdhani for tech-vibe headings, Inter for readable body text -->
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        rajdhani: ['Rajdhani', 'sans-serif'],
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: '#f8fafc', // Ditukar ke light slate
+                        card: '#ffffff',
+                        primary: '#0ea5e9', // Sky Blue (Lebih cerah untuk pastel)
+                        secondary: '#8b5cf6', // Violet
+                        accent: '#f43f5e' // Rose
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- PapaParse for Google Sheets CSV Parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            background-color: #f8fafc;
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(210, 100%, 94%, 1) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(280, 100%, 95%, 0.8) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(340, 100%, 94%, 1) 0, transparent 50%);
+            background-attachment: fixed;
+            color: #334155;
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 1);
+            box-shadow: 0 4px 24px 0 rgba(148, 163, 184, 0.15);
+        }
+
+        .text-glow {
+            text-shadow: 0 0 15px rgba(14, 165, 233, 0.3);
+        }
+
+        /* Custom Scrollbar for Table (Light Mode) */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        #loadingOverlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .loader {
+            border: 4px solid rgba(14, 165, 233, 0.2);
+            border-left-color: #0ea5e9;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="font-inter min-h-screen p-4 md:p-8">
+
+    <!-- Loading Screen -->
+    <div id="loadingOverlay">
+        <div class="loader mb-4"></div>
+        <h2 class="font-rajdhani text-2xl text-primary font-bold tracking-wider">MENGAKSES PANGKALAN DATA STEM...</h2>
+        <p class="text-slate-500 text-sm mt-2 font-medium">Menarik data secara live dari Google Sheets</p>
+    </div>
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Header Section -->
+        <header class="glass-panel rounded-2xl p-6 relative overflow-hidden">
+            <div class="absolute -right-4 -top-8 text-primary opacity-5 text-[10rem]">
+                <i class="fa-solid fa-microchip"></i>
+            </div>
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                <div>
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="bg-primary/10 p-2 rounded-lg text-primary shadow-sm border border-primary/20">
+                            <i class="fa-solid fa-rocket text-xl"></i>
+                        </div>
+                        <h3 class="text-primary font-rajdhani font-bold tracking-widest uppercase text-sm">Sistem Pemantauan Bersepadu</h3>
+                    </div>
+                    <h1 class="text-3xl md:text-4xl font-rajdhani font-extrabold text-slate-800 tracking-tight">SENARAI PESERTA STEM</h1>
+                    <h2 class="text-xl md:text-2xl font-rajdhani font-bold text-slate-500">PERINGKAT DAERAH SELURUH TERENGGANU 2026</h2>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm text-slate-500 font-medium">Status Data</div>
+                    <div class="flex items-center gap-2 justify-end text-emerald-500 font-bold bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 mt-1 shadow-sm">
+                        <i class="fa-solid fa-satellite-dish animate-pulse"></i> Live Terhubung
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Statistics Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Total Peserta -->
+            <div class="glass-panel rounded-xl p-5 border-l-4 border-l-primary flex items-center justify-between group hover:bg-white/80 hover:shadow-md transition duration-300">
+                <div>
+                    <p class="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Jumlah Peserta</p>
+                    <h3 class="text-3xl font-rajdhani font-bold text-slate-800" id="stat-peserta">0</h3>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition shadow-inner">
+                    <i class="fa-solid fa-user-astronaut text-xl"></i>
+                </div>
+            </div>
+
+            <!-- Sekolah Paling Aktif -->
+            <div class="glass-panel rounded-xl p-5 border-l-4 border-l-secondary flex items-center justify-between group hover:bg-white/80 hover:shadow-md transition duration-300">
+                <div class="w-2/3">
+                    <p class="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Sekolah Teraktif</p>
+                    <h3 class="text-lg font-rajdhani font-bold text-slate-800 truncate" id="stat-sekolah">-</h3>
+                    <p class="text-xs text-secondary font-medium mt-1" id="stat-sekolah-count">0 penyertaan</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center text-secondary group-hover:scale-110 transition shrink-0 shadow-inner">
+                    <i class="fa-solid fa-school-flag text-xl"></i>
+                </div>
+            </div>
+
+            <!-- Daerah Tertinggi -->
+            <div class="glass-panel rounded-xl p-5 border-l-4 border-l-accent flex items-center justify-between group hover:bg-white/80 hover:shadow-md transition duration-300">
+                <div class="w-2/3">
+                    <p class="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Daerah Juara</p>
+                    <h3 class="text-lg font-rajdhani font-bold text-slate-800 truncate" id="stat-daerah">-</h3>
+                    <p class="text-xs text-accent font-medium mt-1" id="stat-daerah-count">0 penyertaan</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition shrink-0 shadow-inner">
+                    <i class="fa-solid fa-map-location-dot text-xl"></i>
+                </div>
+            </div>
+
+            <!-- Jumlah Kategori Pertandingan -->
+            <div class="glass-panel rounded-xl p-5 border-l-4 border-l-emerald-500 flex items-center justify-between group hover:bg-white/80 hover:shadow-md transition duration-300">
+                <div>
+                    <p class="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Kategori Dipertandingkan</p>
+                    <h3 class="text-3xl font-rajdhani font-bold text-slate-800" id="stat-kategori">0</h3>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:scale-110 transition shadow-inner">
+                    <i class="fa-solid fa-gamepad text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Chart Section -->
+            <div class="lg:col-span-2 glass-panel rounded-2xl p-6">
+                <h3 class="font-rajdhani font-bold text-xl mb-4 flex items-center gap-2 text-slate-800">
+                    <i class="fa-solid fa-chart-simple text-primary"></i> Analisis Penyertaan Mengikut Pertandingan
+                </h3>
+                <div class="relative h-64 md:h-80 w-full">
+                    <canvas id="pertandinganChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Filter Section -->
+            <div class="glass-panel rounded-2xl p-6">
+                <h3 class="font-rajdhani font-bold text-xl mb-4 flex items-center gap-2 text-slate-800">
+                    <i class="fa-solid fa-filter text-secondary"></i> Filter Data Panel
+                </h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-2">Pilih Daerah</label>
+                        <div class="relative">
+                            <select id="filter-daerah" class="w-full bg-white border border-slate-200 text-slate-700 rounded-xl p-3 appearance-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition cursor-pointer shadow-sm">
+                                <option value="ALL">Semua Daerah</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-2 mt-4">Jenis Pertandingan</label>
+                        <div class="relative">
+                            <select id="filter-pertandingan" class="w-full bg-white border border-slate-200 text-slate-700 rounded-xl p-3 appearance-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition cursor-pointer shadow-sm">
+                                <option value="ALL">Semua Pertandingan</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="pt-4">
+                        <button id="btn-reset" class="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 font-semibold py-3 px-4 rounded-xl transition duration-200 flex justify-center items-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-rotate-right"></i> Reset Filter
+                        </button>
+                    </div>
+                    
+                    <div class="mt-6 bg-blue-50 border border-blue-100 p-4 rounded-xl flex items-start gap-3 shadow-sm">
+                        <i class="fa-solid fa-circle-info text-blue-500 mt-1"></i>
+                        <p class="text-xs text-slate-600 leading-relaxed font-medium">
+                            Data dipaparkan hanya merangkumi ruangan <strong>Daerah, Nama Sekolah, Jenis Pertandingan, Nama Murid</strong> dan <strong>Guru Pengiring</strong> seperti yang diminta.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table Section -->
+        <div class="glass-panel rounded-2xl p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-rajdhani font-bold text-xl flex items-center gap-2 text-slate-800">
+                    <i class="fa-solid fa-table-list text-accent"></i> Senarai Lengkap Peserta
+                </h3>
+                <span id="row-count" class="bg-indigo-50 border border-indigo-100 text-indigo-600 text-xs py-1.5 px-3 rounded-full font-bold shadow-sm">0 Kumpulan/Pasukan</span>
+            </div>
+            
+            <div class="overflow-x-auto rounded-xl border border-white/60 bg-white/40 shadow-sm">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100/80 text-slate-600 text-sm font-rajdhani uppercase tracking-wider">
+                            <th class="p-4 font-bold border-b border-slate-200">Bil</th>
+                            <th class="p-4 font-bold border-b border-slate-200">Daerah</th>
+                            <th class="p-4 font-bold border-b border-slate-200">Nama Sekolah</th>
+                            <th class="p-4 font-bold border-b border-slate-200">Jenis Pertandingan</th>
+                            <th class="p-4 font-bold border-b border-slate-200">Nama Murid</th>
+                            <th class="p-4 font-bold border-b border-slate-200">Guru Pengiring</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body" class="text-sm divide-y divide-slate-200">
+                        <!-- Data rows will be injected here -->
+                    </tbody>
+                </table>
+                <div id="no-data-msg" class="hidden p-8 text-center text-slate-500">
+                    <i class="fa-solid fa-folder-open text-4xl mb-3 opacity-50 text-slate-400"></i>
+                    <p class="font-medium">Tiada rekod ditemui berdasarkan filter yang dipilih.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="text-center pb-6 text-slate-500 text-sm font-rajdhani font-medium">
+            Sistem Paparan Pintar STEM Terengganu &copy; 2026 | Antaramuka Digital
+        </div>
+
+    </div>
+
+    <script>
+        // Google Sheet CSV Export Link based on provided URL
+        const SHEET_ID = '1nXy04NFUJXhpjm5wJZ3P06Kp008FyYtTg2EzjuCTgqU';
+        const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
+
+        // Global state for raw and filtered data
+        let rawData = [];
+        let filteredData = [];
+        let chartInstance = null;
+
+        // Keys we are mapping to. (Handles slight variations in header names from the Google Sheet)
+        let colMap = {
+            daerah: '',
+            sekolah: '',
+            pertandingan: '',
+            murid: '',
+            guru: ''
+        };
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchData();
+            setupEventListeners();
+        });
+
+        function fetchData() {
+            Papa.parse(CSV_URL, {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if(results.data && results.data.length > 0) {
+                        identifyColumns(results.meta.fields);
+                        
+                        // Clean and normalize data
+                        let tempRawData = results.data.filter(row => {
+                            // Only keep rows that have at least a school or student name to avoid completely empty ghost rows
+                            return row[colMap.sekolah] || row[colMap.murid];
+                        }).map(row => ({
+                            daerah: row[colMap.daerah] ? row[colMap.daerah].trim() : 'TIADA MAKLUMAT',
+                            sekolah: row[colMap.sekolah] ? row[colMap.sekolah].trim() : 'TIADA MAKLUMAT',
+                            pertandingan: row[colMap.pertandingan] ? row[colMap.pertandingan].trim() : 'TIADA MAKLUMAT',
+                            murid: row[colMap.murid] ? row[colMap.murid].trim() : 'TIADA MAKLUMAT',
+                            guru: row[colMap.guru] ? row[colMap.guru].trim() : 'TIADA MAKLUMAT'
+                        }));
+
+                        // Proses Gabungan (Grouping) berdasarkan Sekolah dan Pertandingan
+                        let groupedMap = {};
+                        tempRawData.forEach(item => {
+                            // Jadikan gabungan sekolah & pertandingan sebagai "Unique Key"
+                            let key = item.sekolah + "_||_" + item.pertandingan;
+                            
+                            if (!groupedMap[key]) {
+                                // Cipta entry baru jika belum wujud, gunakan array untuk murid & guru
+                                groupedMap[key] = {
+                                    daerah: item.daerah,
+                                    sekolah: item.sekolah,
+                                    pertandingan: item.pertandingan,
+                                    murid: item.murid !== 'TIADA MAKLUMAT' ? [item.murid] : [],
+                                    guru: item.guru !== 'TIADA MAKLUMAT' ? [item.guru] : []
+                                };
+                            } else {
+                                // Jika kumpulan telah wujud, tambah nama murid/guru ke dalam senarai (elak duplikasi)
+                                if (item.murid !== 'TIADA MAKLUMAT' && !groupedMap[key].murid.includes(item.murid)) {
+                                    groupedMap[key].murid.push(item.murid);
+                                }
+                                if (item.guru !== 'TIADA MAKLUMAT' && !groupedMap[key].guru.includes(item.guru)) {
+                                    groupedMap[key].guru.push(item.guru);
+                                }
+                            }
+                        });
+
+                        // Convert kembali Object kepada Array
+                        rawData = Object.values(groupedMap);
+
+                        filteredData = [...rawData];
+                        
+                        populateFilters();
+                        updateDashboard();
+                        
+                        // Hide loader
+                        document.getElementById('loadingOverlay').style.display = 'none';
+                    } else {
+                        showError("Data tidak ditemui atau helaian kosong.");
+                    }
+                },
+                error: function(error) {
+                    console.error("Error fetching data: ", error);
+                    showError("Ralat semasa mengakses data dari Google Sheets. Sila pastikan link adalah public (Anyone with the link can view).");
+                }
+            });
+        }
+
+        // Smart column mapping in case the sheet headers don't strictly match our expected strings
+        function identifyColumns(headers) {
+            headers.forEach(header => {
+                const h = header.toUpperCase();
+                if (h.includes('DAERAH') && !colMap.daerah) colMap.daerah = header;
+                else if (h.includes('SEKOLAH') && !colMap.sekolah) colMap.sekolah = header;
+                else if (h.includes('PERTANDINGAN') && !colMap.pertandingan) colMap.pertandingan = header;
+                else if ((h.includes('MURID') || h.includes('PESERTA') || h.includes('NAMA')) && !h.includes('GURU') && !colMap.murid) colMap.murid = header;
+                else if (h.includes('GURU') && !colMap.guru) colMap.guru = header;
+            });
+
+            // Fallback if strict mapping failed (just taking first 5 columns sequentially)
+            if(!colMap.daerah) colMap.daerah = headers[0] || '';
+            if(!colMap.sekolah) colMap.sekolah = headers[1] || '';
+            if(!colMap.pertandingan) colMap.pertandingan = headers[2] || '';
+            if(!colMap.murid) colMap.murid = headers[3] || '';
+            if(!colMap.guru) colMap.guru = headers[4] || '';
+        }
+
+        function showError(msg) {
+            document.getElementById('loadingOverlay').innerHTML = `
+                <div class="text-accent text-5xl mb-4"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <h2 class="font-rajdhani text-2xl text-accent font-bold tracking-wider">RALAT DATA</h2>
+                <p class="text-slate-300 mt-2 text-center max-w-md">${msg}</p>
+                <button onclick="location.reload()" class="mt-6 bg-accent hover:bg-rose-600 px-6 py-2 rounded-lg font-semibold transition">Cuba Semula</button>
+            `;
+        }
+
+        function populateFilters() {
+            const daerahSet = new Set();
+            const pertandinganSet = new Set();
+
+            rawData.forEach(item => {
+                if(item.daerah && item.daerah !== 'TIADA MAKLUMAT') daerahSet.add(item.daerah);
+                if(item.pertandingan && item.pertandingan !== 'TIADA MAKLUMAT') pertandinganSet.add(item.pertandingan);
+            });
+
+            const selDaerah = document.getElementById('filter-daerah');
+            const selPertandingan = document.getElementById('filter-pertandingan');
+
+            Array.from(daerahSet).sort().forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d; opt.textContent = d;
+                selDaerah.appendChild(opt);
+            });
+
+            Array.from(pertandinganSet).sort().forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p; opt.textContent = p;
+                selPertandingan.appendChild(opt);
+            });
+        }
+
+        function setupEventListeners() {
+            document.getElementById('filter-daerah').addEventListener('change', applyFilters);
+            document.getElementById('filter-pertandingan').addEventListener('change', applyFilters);
+            document.getElementById('btn-reset').addEventListener('click', () => {
+                document.getElementById('filter-daerah').value = 'ALL';
+                document.getElementById('filter-pertandingan').value = 'ALL';
+                applyFilters();
+            });
+        }
+
+        function applyFilters() {
+            const fDaerah = document.getElementById('filter-daerah').value;
+            const fPertandingan = document.getElementById('filter-pertandingan').value;
+
+            filteredData = rawData.filter(item => {
+                const matchDaerah = (fDaerah === 'ALL') || (item.daerah === fDaerah);
+                const matchPert = (fPertandingan === 'ALL') || (item.pertandingan === fPertandingan);
+                return matchDaerah && matchPert;
+            });
+
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            updateStats();
+            updateTable();
+            renderChart();
+        }
+
+        function updateStats() {
+            // Jumlah Peserta (Kira jumlah sebenar murid dalam semua array)
+            const totalPeserta = filteredData.reduce((sum, d) => sum + d.murid.length, 0);
+            document.getElementById('stat-peserta').textContent = totalPeserta;
+
+            if (filteredData.length === 0) {
+                document.getElementById('stat-sekolah').textContent = '-';
+                document.getElementById('stat-sekolah-count').textContent = '0 penyertaan';
+                document.getElementById('stat-daerah').textContent = '-';
+                document.getElementById('stat-daerah-count').textContent = '0 penyertaan';
+                document.getElementById('stat-kategori').textContent = '0';
+                return;
+            }
+
+            // Kategori Dipertandingkan
+            const katSet = new Set(filteredData.map(d => d.pertandingan));
+            document.getElementById('stat-kategori').textContent = katSet.size;
+
+            // Analytics: Sekolah paling banyak & Daerah paling tinggi
+            const sekCount = {};
+            const daeCount = {};
+
+            filteredData.forEach(d => {
+                if(d.sekolah && d.sekolah !== 'TIADA MAKLUMAT') sekCount[d.sekolah] = (sekCount[d.sekolah] || 0) + 1;
+                if(d.daerah && d.daerah !== 'TIADA MAKLUMAT') daeCount[d.daerah] = (daeCount[d.daerah] || 0) + 1;
+            });
+
+            let topSekolah = { nama: '-', count: 0 };
+            for(const [nama, count] of Object.entries(sekCount)) {
+                if(count > topSekolah.count) { topSekolah = { nama, count }; }
+            }
+
+            let topDaerah = { nama: '-', count: 0 };
+            for(const [nama, count] of Object.entries(daeCount)) {
+                if(count > topDaerah.count) { topDaerah = { nama, count }; }
+            }
+
+            document.getElementById('stat-sekolah').textContent = topSekolah.nama;
+            document.getElementById('stat-sekolah-count').textContent = `${topSekolah.count} penyertaan peserta`;
+            document.getElementById('stat-daerah').textContent = topDaerah.nama;
+            document.getElementById('stat-daerah-count').textContent = `${topDaerah.count} penyertaan peserta`;
+        }
+
+        function updateTable() {
+            const tbody = document.getElementById('table-body');
+            const noData = document.getElementById('no-data-msg');
+            const rowCount = document.getElementById('row-count');
+            
+            tbody.innerHTML = '';
+            // Kemas kini teks kepada bilangan Pasukan/Kumpulan memandangkan data telah digabungkan
+            rowCount.textContent = `${filteredData.length} Kumpulan/Pasukan`;
+
+            if(filteredData.length === 0) {
+                noData.classList.remove('hidden');
+                return;
+            } else {
+                noData.classList.add('hidden');
+            }
+
+            filteredData.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-700/50 transition duration-150";
+                
+                // Format paparan senarai nama murid (Kotak/Tag)
+                let muridDisplay = '<span class="text-slate-400 italic text-xs">TIADA MAKLUMAT</span>';
+                if (item.murid.length > 0) {
+                    muridDisplay = `<div class="flex flex-col gap-1.5">
+                        ${item.murid.map(m => `
+                            <div class="bg-sky-50 border border-sky-200 text-sky-700 px-2.5 py-1.5 rounded-lg text-sm font-medium flex items-start gap-2 shadow-sm hover:bg-sky-100 transition">
+                                <i class="fa-solid fa-user-graduate mt-0.5 text-sky-500 shrink-0"></i>
+                                <span class="leading-tight">${m}</span>
+                            </div>
+                        `).join('')}
+                    </div>`;
+                }
+
+                // Format paparan senarai guru (Kotak/Tag)
+                let guruDisplay = '<span class="text-slate-400 italic text-xs">TIADA MAKLUMAT</span>';
+                if (item.guru.length > 0) {
+                    guruDisplay = `<div class="flex flex-col gap-1.5">
+                        ${item.guru.map(g => `
+                            <div class="bg-violet-50 border border-violet-200 text-violet-700 px-2.5 py-1.5 rounded-lg text-sm font-medium flex items-start gap-2 shadow-sm hover:bg-violet-100 transition">
+                                <i class="fa-solid fa-chalkboard-user mt-0.5 text-violet-500 shrink-0"></i>
+                                <span class="leading-tight">${g}</span>
+                            </div>
+                        `).join('')}
+                    </div>`;
+                }
+
+                // align-top diletakkan supaya data selari jika senarai nama terlalu panjang
+                tr.innerHTML = `
+                    <td class="p-4 whitespace-nowrap text-slate-500 font-semibold align-top">${index + 1}</td>
+                    <td class="p-4 align-top"><span class="bg-indigo-50 text-indigo-600 border border-indigo-200 px-2 py-1 rounded-md text-xs font-bold whitespace-nowrap shadow-sm">${item.daerah}</span></td>
+                    <td class="p-4 font-bold text-slate-800 align-top">${item.sekolah}</td>
+                    <td class="p-4 text-primary font-bold align-top">${item.pertandingan}</td>
+                    <td class="p-4 align-top">${muridDisplay}</td>
+                    <td class="p-4 align-top">${guruDisplay}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('pertandinganChart').getContext('2d');
+            
+            // Calculate totals per category
+            const pertCount = {};
+            filteredData.forEach(d => {
+                if(d.pertandingan && d.pertandingan !== 'TIADA MAKLUMAT') {
+                    pertCount[d.pertandingan] = (pertCount[d.pertandingan] || 0) + 1;
+                }
+            });
+
+            // Sort by highest participation
+            const sortedPert = Object.keys(pertCount).sort((a,b) => pertCount[b] - pertCount[a]);
+            const labels = sortedPert;
+            const data = sortedPert.map(k => pertCount[k]);
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            Chart.defaults.color = '#64748b'; // slate-500
+            Chart.defaults.font.family = 'Inter';
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Jumlah Penyertaan',
+                        data: data,
+                        backgroundColor: 'rgba(14, 165, 233, 0.8)', // Primary color
+                        borderColor: 'rgba(14, 165, 233, 1)',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        hoverBackgroundColor: 'rgba(139, 92, 246, 0.9)', // Secondary hover
+                        hoverBorderColor: 'rgba(139, 92, 246, 1)',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#0f172a', // slate-900
+                            bodyColor: '#334155', // slate-700
+                            titleFont: { family: 'Rajdhani', size: 16, weight: 'bold' },
+                            bodyFont: { family: 'Inter', size: 14, weight: '500' },
+                            padding: 12,
+                            borderColor: 'rgba(226, 232, 240, 1)', // slate-200
+                            borderWidth: 1,
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                            ticks: { precision: 0 } // whole numbers only
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45,
+                                autoSkip: false,
+                                callback: function(val, index) {
+                                    // Truncate long labels for aesthetic
+                                    let label = this.getLabelForValue(val);
+                                    return label.length > 20 ? label.substr(0, 20) + '...' : label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
